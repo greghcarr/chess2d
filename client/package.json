@@ -9,10 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "phaser": "^3.87.0",
+    "@colyseus/schema": "^2.0.37",
     "@supabase/supabase-js": "^2.49.0",
+    "chess.js": "^1.4.0",
     "colyseus.js": "^0.15.28",
-    "chess.js": "^1.4.0"
+    "phaser": "^3.87.0"
   },
   "devDependencies": {
     "vite": "^6.2.0"

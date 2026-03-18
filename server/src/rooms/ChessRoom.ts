@@ -1,9 +1,9 @@
 import { Room, Client } from "colyseus";
 import { Chess } from "chess.js";
-import { ChessState, ChatMessage } from "../schema/ChessState.js";
-import { MSG } from "chess2d-shared/protocol.js";
-import type { GameResult, EndReason, GameOverData } from "chess2d-shared/chessTypes.js";
-import { supabaseAdmin } from "../db/supabaseAdmin.js";
+import { ChessState, ChatMessage } from "../schema/ChessState";
+import { MSG } from "chess2d-shared/protocol";
+import type { GameResult, EndReason, GameOverData } from "chess2d-shared/chessTypes";
+import { getSupabaseAdmin } from "../db/supabaseAdmin";
 
 export class ChessRoom extends Room<ChessState> {
   private chess!: Chess;
@@ -174,7 +174,7 @@ export class ChessRoom extends Room<ChessState> {
   private async recordGameResult(result: GameResult, reason: EndReason): Promise<void> {
     try {
       // Record the game
-      await supabaseAdmin.from("game_results").insert({
+      await getSupabaseAdmin().from("game_results").insert({
         white_username: this.state.whiteUsername,
         black_username: this.state.blackUsername,
         result,
@@ -184,14 +184,14 @@ export class ChessRoom extends Room<ChessState> {
 
       // Update player stats
       if (result === "white_win") {
-        await supabaseAdmin.rpc("increment_wins", { player_username: this.state.whiteUsername });
-        await supabaseAdmin.rpc("increment_losses", { player_username: this.state.blackUsername });
+        await getSupabaseAdmin().rpc("increment_wins", { player_username: this.state.whiteUsername });
+        await getSupabaseAdmin().rpc("increment_losses", { player_username: this.state.blackUsername });
       } else if (result === "black_win") {
-        await supabaseAdmin.rpc("increment_wins", { player_username: this.state.blackUsername });
-        await supabaseAdmin.rpc("increment_losses", { player_username: this.state.whiteUsername });
+        await getSupabaseAdmin().rpc("increment_wins", { player_username: this.state.blackUsername });
+        await getSupabaseAdmin().rpc("increment_losses", { player_username: this.state.whiteUsername });
       } else {
-        await supabaseAdmin.rpc("increment_draws", { player_username: this.state.whiteUsername });
-        await supabaseAdmin.rpc("increment_draws", { player_username: this.state.blackUsername });
+        await getSupabaseAdmin().rpc("increment_draws", { player_username: this.state.whiteUsername });
+        await getSupabaseAdmin().rpc("increment_draws", { player_username: this.state.blackUsername });
       }
     } catch (err) {
       console.error("Failed to record game result:", err);

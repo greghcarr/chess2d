@@ -122,37 +122,23 @@ export class OverworldScene extends Phaser.Scene {
       this.room = await colyseusClient.joinOrCreate("overworld", {
         username: this.username,
       });
+      console.log(`[overworld] connected as ${this.room.sessionId}`);
+      console.log(`[overworld] state:`, this.room.state);
+      console.log(`[overworld] state keys:`, this.room.state ? Object.keys(this.room.state) : "no state");
+      console.log(`[overworld] players:`, this.room.state?.players);
 
-      // Listen for state changes on all players
-      this.room.state.players.onAdd((playerState: any, sessionId: string) => {
-        if (sessionId === this.room!.sessionId) return;
-        const remote = new RemotePlayer(
-          this,
-          sessionId,
-          playerState.x,
-          playerState.y,
-          playerState.username
-        );
-        this.remotePlayers.set(sessionId, remote);
-
-        playerState.onChange(() => {
-          remote.updateServerPosition(playerState.x, playerState.y);
-          remote.inBattle = playerState.inBattle;
-        });
-
-        // Click on remote player to request battle
-        remote.graphics.on("pointerdown", () => {
-          this.showBattleMenu(remote);
-        });
-      });
-
-      this.room.state.players.onRemove((_playerState: any, sessionId: string) => {
-        const remote = this.remotePlayers.get(sessionId);
-        if (remote) {
-          remote.destroy();
-          this.remotePlayers.delete(sessionId);
+      this.room.onStateChange((state: any) => {
+        const players = state?.players;
+        console.log(`[overworld] onStateChange fired`);
+        if (players) {
+          console.log(`[overworld] players size:`, players.size);
+          players.forEach((p: any, key: string) => {
+            console.log(`[overworld] player in map: ${key}`, p?.username, p?.x, p?.y);
+          });
         }
       });
+
+      this.setupStateListeners();
 
       // Chat messages
       this.room.onMessage(MSG.CHAT, (message: { username: string; text: string }) => {
@@ -186,6 +172,62 @@ export class OverworldScene extends Phaser.Scene {
       });
     } catch (err) {
       console.error("Failed to connect to server:", err);
+    }
+  }
+
+  private setupStateListeners(): void {
+    if (!this.room) return;
+
+    const tryAttach = () => {
+      if (!this.room?.state?.players) return false;
+
+      this.room.state.players.onAdd((playerState: any, sessionId: string) => {
+        if (sessionId === this.room!.sessionId) return;
+        console.log(`[overworld] player added: ${sessionId} (${playerState.username})`);
+        const remote = new RemotePlayer(
+          this,
+          sessionId,
+          playerState.x,
+          playerState.y,
+          playerState.username
+        );
+        this.remotePlayers.set(sessionId, remote);
+
+        playerState.listen("x", (value: number) => {
+          remote.updateServerPosition(value, remote.serverY);
+        });
+        playerState.listen("y", (value: number) => {
+          remote.updateServerPosition(remote.serverX, value);
+        });
+        playerState.listen("inBattle", (value: boolean) => {
+          remote.inBattle = value;
+        });
+
+        remote.graphics.on("pointerdown", () => {
+          this.showBattleMenu(remote);
+        });
+      });
+
+      this.room.state.players.onRemove((_playerState: any, sessionId: string) => {
+        const remote = this.remotePlayers.get(sessionId);
+        if (remote) {
+          remote.destroy();
+          this.remotePlayers.delete(sessionId);
+        }
+      });
+
+      return true;
+    };
+
+    // Try immediately; if players isn't ready yet, wait for first state change
+    if (!tryAttach()) {
+      console.log("[overworld] waiting for state.players...");
+      const unsub = this.room.onStateChange(() => {
+        if (tryAttach()) {
+          console.log("[overworld] state.players attached");
+          unsub();
+        }
+      });
     }
   }
 

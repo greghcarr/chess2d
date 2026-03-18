@@ -1,10 +1,14 @@
+import { resolve } from "path";
+import dotenv from "dotenv";
+dotenv.config({ path: resolve(__dirname, "../../.env") });
+
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { createServer } from "http";
 import express from "express";
 import cors from "cors";
-import { OverworldRoom } from "./rooms/OverworldRoom.js";
-import { ChessRoom } from "./rooms/ChessRoom.js";
+import { OverworldRoom } from "./rooms/OverworldRoom";
+import { ChessRoom } from "./rooms/ChessRoom";
 
 const PORT = parseInt(process.env.COLYSEUS_PORT || "2567");
 

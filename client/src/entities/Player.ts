@@ -23,7 +23,6 @@ export class Player {
 
     this.graphics = scene.add.graphics();
     this.graphics.setDepth(LAYER.LOCAL_PLAYER);
-    this.draw();
 
     this.nameText = scene.add
       .text(x, y + PLAYER_NAME_OFFSET_Y, username, {
@@ -34,6 +33,8 @@ export class Player {
       })
       .setOrigin(0.5, 1)
       .setDepth(LAYER.PLAYER_NAMES);
+
+    this.draw();
   }
 
   setTarget(tx: number, ty: number): void {

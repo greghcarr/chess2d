@@ -1,9 +1,9 @@
 import { Room, Client } from "colyseus";
-import { OverworldState } from "../schema/OverworldState.js";
-import { PlayerState } from "../schema/PlayerState.js";
-import { PATCH_RATE_MS } from "../constants.js";
-import { WORLD_WIDTH, WORLD_HEIGHT, FENCE_THICKNESS, SPAWN_X, SPAWN_Y } from "chess2d-shared/worldConfig.js";
-import { MSG } from "chess2d-shared/protocol.js";
+import { OverworldState } from "../schema/OverworldState";
+import { PlayerState } from "../schema/PlayerState";
+import { PATCH_RATE_MS } from "../constants";
+import { WORLD_WIDTH, WORLD_HEIGHT, FENCE_THICKNESS, SPAWN_X, SPAWN_Y } from "chess2d-shared/worldConfig";
+import { MSG } from "chess2d-shared/protocol";
 
 export class OverworldRoom extends Room<OverworldState> {
   private battleRequests = new Map<string, string>(); // requester -> target
@@ -94,7 +94,10 @@ export class OverworldRoom extends Room<OverworldState> {
     player.y = SPAWN_Y;
     player.username = options.username || `Player_${client.sessionId.substring(0, 4)}`;
     this.state.players.set(client.sessionId, player);
-    console.log(`${player.username} joined the overworld`);
+    console.log(`${player.username} joined the overworld (total: ${this.state.players.size})`);
+    this.state.players.forEach((p: PlayerState, key: string) => {
+      console.log(`  [state] player: ${key} => ${p.username} (${p.x}, ${p.y})`);
+    });
   }
 
   onLeave(client: Client): void {

@@ -95,6 +95,10 @@ export class AuthScene extends Phaser.Scene {
       errorEl.textContent = "Please fill in all fields.";
       return;
     }
+    if (/\s/.test(username) || /\s/.test(password)) {
+      errorEl.textContent = "Spaces are not allowed in username or password.";
+      return;
+    }
 
     // Supabase auth uses email — we construct a fake email from the username
     const email = `${username.toLowerCase()}@chess2d.local`;
@@ -116,6 +120,10 @@ export class AuthScene extends Phaser.Scene {
 
     if (!username || !password || !confirm) {
       errorEl.textContent = "Please fill in all fields.";
+      return;
+    }
+    if (/\s/.test(username) || /\s/.test(password)) {
+      errorEl.textContent = "Spaces are not allowed in username or password.";
       return;
     }
     if (password !== confirm) {
