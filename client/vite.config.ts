@@ -21,8 +21,9 @@ export default defineConfig({
       "Cache-Control": "no-store",
     },
   },
+  base: process.env.GITHUB_ACTIONS ? "/chess2d/" : "/",
   build: {
-    outDir: "../dist/client",
+    outDir: "dist",
     emptyOutDir: true,
   },
 });

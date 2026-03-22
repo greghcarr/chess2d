@@ -1,6 +1,8 @@
 import { resolve } from "path";
 import dotenv from "dotenv";
+// In production (Railway), env vars are set directly — .env is for local dev only
 dotenv.config({ path: resolve(__dirname, "../../.env") });
+dotenv.config(); // also check cwd/.env as fallback
 
 import { Server } from "colyseus";
 import { WebSocketTransport } from "@colyseus/ws-transport";
@@ -10,7 +12,7 @@ import cors from "cors";
 import { OverworldRoom } from "./rooms/OverworldRoom";
 import { ChessRoom } from "./rooms/ChessRoom";
 
-const PORT = parseInt(process.env.COLYSEUS_PORT || "2567");
+const PORT = parseInt(process.env.PORT || process.env.COLYSEUS_PORT || "2567");
 
 const app = express();
 app.use(cors({ origin: true }));
