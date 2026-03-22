@@ -1,11 +1,12 @@
 import Phaser from "phaser";
 import {
-  PLAYER_RADIUS,
   PLAYER_SPEED,
   PLAYER_NAME_OFFSET_Y,
-  COLOR_PLAYER,
+  CHAT_BUBBLE_OFFSET_Y,
+  CHAT_BUBBLE_DURATION,
 } from "@/constants.js";
 import { LAYER } from "@/layers.js";
+import { drawPlayerShape } from "@/entities/drawPlayerShape.js";
 
 export class Player {
   readonly graphics: Phaser.GameObjects.Graphics;
@@ -15,11 +16,21 @@ export class Player {
   targetX: number | null = null;
   targetY: number | null = null;
   readonly username: string;
+  private color: number;
+  private alpha: number;
+  private shape: string;
+  private chatBubble: Phaser.GameObjects.Text | null = null;
+  private chatBubbleTimer: Phaser.Time.TimerEvent | null = null;
+  private scene: Phaser.Scene;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, username: string) {
+  constructor(scene: Phaser.Scene, x: number, y: number, username: string, color: number = 0x000000, alpha: number = 0.5) {
     this.x = x;
     this.y = y;
     this.username = username;
+    this.color = color;
+    this.alpha = alpha;
+    this.shape = "circle";
+    this.scene = scene;
 
     this.graphics = scene.add.graphics();
     this.graphics.setDepth(LAYER.LOCAL_PLAYER);
@@ -30,6 +41,7 @@ export class Player {
         color: "#ffffff",
         fontFamily: "monospace",
         align: "center",
+        resolution: 2,
       })
       .setOrigin(0.5, 1)
       .setDepth(LAYER.PLAYER_NAMES);
@@ -67,23 +79,61 @@ export class Player {
     this.draw();
   }
 
+  setColor(color: number, alpha: number = 1): void {
+    this.color = color;
+    this.alpha = alpha;
+    this.draw();
+  }
+
+  setShape(shape: string): void {
+    this.shape = shape;
+    this.draw();
+  }
+
+  setAdmin(isAdmin: boolean): void {
+    if (isAdmin) {
+      this.nameText.setText(`[Admin] ${this.username}`);
+      this.nameText.setColor("#ff4444");
+    }
+  }
+
+  redraw(): void {
+    this.draw();
+  }
+
   private draw(): void {
     this.graphics.clear();
-    this.graphics.fillStyle(COLOR_PLAYER, 1);
-    this.graphics.fillCircle(this.x, this.y, PLAYER_RADIUS);
-    // Simple body: small rectangle below circle
-    this.graphics.fillRoundedRect(
-      this.x - PLAYER_RADIUS * 0.6,
-      this.y + PLAYER_RADIUS * 0.4,
-      PLAYER_RADIUS * 1.2,
-      PLAYER_RADIUS * 1.0,
-      4
-    );
+    drawPlayerShape(this.graphics, this.x, this.y, this.shape, this.color, this.alpha);
     this.nameText.setPosition(this.x, this.y + PLAYER_NAME_OFFSET_Y);
+    this.chatBubble?.setPosition(this.x, this.y + CHAT_BUBBLE_OFFSET_Y);
+  }
+
+  showChatBubble(text: string, color: number): void {
+    this.chatBubble?.destroy();
+    this.chatBubbleTimer?.remove();
+
+    const cssColor = `#${color.toString(16).padStart(6, "0")}`;
+    this.chatBubble = this.scene.add
+      .text(this.x, this.y + CHAT_BUBBLE_OFFSET_Y, text, {
+        fontSize: "12px",
+        color: cssColor,
+        fontFamily: "monospace",
+        align: "center",
+        wordWrap: { width: 160 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(LAYER.PLAYER_NAMES);
+
+    this.chatBubbleTimer = this.scene.time.delayedCall(CHAT_BUBBLE_DURATION, () => {
+      this.chatBubble?.destroy();
+      this.chatBubble = null;
+    });
   }
 
   destroy(): void {
     this.graphics.destroy();
     this.nameText.destroy();
+    this.chatBubble?.destroy();
+    this.chatBubbleTimer?.remove();
   }
 }

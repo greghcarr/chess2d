@@ -28,6 +28,8 @@ export const COLOR_VERSION_TEXT = 0x999999;
 export const PLAYER_RADIUS = 16;
 export const PLAYER_SPEED = 200; // pixels per second
 export const PLAYER_NAME_OFFSET_Y = -28;
+export const CHAT_BUBBLE_OFFSET_Y = -44;
+export const CHAT_BUBBLE_DURATION = 5_000;
 
 // ── Click Marker ─────────────────────────────────────────
 export const CLICK_MARKER_SIZE = 12;
@@ -41,7 +43,7 @@ export const ZOOM_STEP = 0.15;
 export const ZOOM_TWEEN_DURATION = 150; // ms
 
 // ── Minimap ──────────────────────────────────────────────
-export const MINIMAP_SIZE = 160;
+export const MINIMAP_SIZE = 240;
 export const MINIMAP_MARGIN = 16;
 export const MINIMAP_DOT_RADIUS = 3;
 export const MINIMAP_UPDATE_INTERVAL = 500; // ms
@@ -58,8 +60,17 @@ export const CHESS_SQUARE_SIZE = 80;
 export const CHESS_BOARD_SIZE = CHESS_SQUARE_SIZE * 8;
 export const CHESS_PIECE_SCALE = 0.8;
 
+// ── Player Shapes ───────────────────────────────────────
+export const DEFAULT_SHAPES = ["circle"];
+export const ALL_SHAPES = [
+  { value: "circle", label: "Circle" },
+  { value: "diamond", label: "Diamond" },
+  { value: "star", label: "Star" },
+  { value: "triangle", label: "Triangle" },
+];
+
 // ── Battle ───────────────────────────────────────────────
-export const BATTLE_REQUEST_RANGE = 150; // max distance to request a battle
+export const BATTLE_REQUEST_RANGE = 40; // max distance to request a battle
 export const BATTLE_FACE_DISTANCE = 120; // distance apart when facing off
 
 // ── Network ──────────────────────────────────────────────

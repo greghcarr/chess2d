@@ -1,7 +1,9 @@
 // World dimensions in game units (1 unit = 1 pixel at default zoom)
-// "10 meters square" — we treat 1 meter = 100 pixels, so 1000x1000 game units
-export const WORLD_WIDTH = 1000;
-export const WORLD_HEIGHT = 1000;
+export const WORLD_GRID = 8; // 8x8 chessboard
+export const WORLD_SQUARE_SIZE = 125; // pixels per square
+export const WORLD_WIDTH = WORLD_GRID * WORLD_SQUARE_SIZE;
+export const WORLD_HEIGHT = WORLD_GRID * WORLD_SQUARE_SIZE;
 export const FENCE_THICKNESS = 8;
-export const SPAWN_X = WORLD_WIDTH / 2;
-export const SPAWN_Y = WORLD_HEIGHT / 2;
+// Spawn at center of the middle-ish square (e4 in chess terms = row 4, col 4)
+export const SPAWN_X = (Math.floor(WORLD_GRID / 2)) * WORLD_SQUARE_SIZE + WORLD_SQUARE_SIZE / 2;
+export const SPAWN_Y = (Math.floor(WORLD_GRID / 2)) * WORLD_SQUARE_SIZE + WORLD_SQUARE_SIZE / 2;

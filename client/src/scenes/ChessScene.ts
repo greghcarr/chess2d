@@ -4,14 +4,11 @@ import { colyseusClient } from "@/network/colyseusClient.js";
 import { MSG } from "chess2d-shared/protocol.js";
 import { drawPiece } from "@/chess/drawVectorPiece.js";
 import {
-  CHESS_SQUARE_SIZE,
-  CHESS_BOARD_SIZE,
   COLOR_CHESS_LIGHT,
   COLOR_CHESS_DARK,
   COLOR_CHESS_HIGHLIGHT,
   BASE_WIDTH,
   BASE_HEIGHT,
-  CHAT_FONT_SIZE,
 } from "@/constants.js";
 import { LAYER } from "@/layers.js";
 import type { Room } from "colyseus.js";
@@ -23,6 +20,10 @@ export class ChessScene extends Phaser.Scene {
   private playerColor: ChessColor = "w";
   private opponentUsername = "";
   private username = "";
+  private isNpc = false;
+  private npcId = "";
+  private customFen = "";
+  private pendingReward: { type: string; name: string } | null = null;
 
   private boardGraphics!: Phaser.GameObjects.Graphics;
   private pieceGraphics!: Phaser.GameObjects.Graphics;
@@ -30,6 +31,8 @@ export class ChessScene extends Phaser.Scene {
 
   private boardX = 0;
   private boardY = 0;
+  private sqSize = 0;
+  private brdSize = 0;
   private selectedSquare: Square | null = null;
   private legalMoves: Move[] = [];
 
@@ -39,27 +42,39 @@ export class ChessScene extends Phaser.Scene {
   private capturedTextOpponent!: Phaser.GameObjects.Text;
   private statusText!: Phaser.GameObjects.Text;
 
-  private chatMessages: string[] = [];
-  private chatTextObj!: Phaser.GameObjects.Text;
+  private chatMessages: { text: string; time: number }[] = [];
+  private chatTextEl!: HTMLDivElement;
   private chatInput!: HTMLInputElement;
 
   constructor() {
     super({ key: "ChessScene" });
   }
 
-  init(data: { roomId: string; color: string; opponentUsername: string; username: string }): void {
+  init(data: {
+    roomId: string;
+    color: string;
+    opponentUsername: string;
+    username: string;
+    isNpc?: boolean;
+    npcId?: string;
+    fen?: string;
+  }): void {
     this.playerColor = data.color as ChessColor;
     this.opponentUsername = data.opponentUsername;
     this.username = data.username;
+    this.isNpc = data.isNpc ?? false;
+    this.npcId = data.npcId ?? "";
+    this.customFen = data.fen ?? "";
   }
 
   create(): void {
-    this.chess = new Chess();
+    this.chess = this.customFen ? new Chess(this.customFen) : new Chess();
     this.capturedWhite = [];
     this.capturedBlack = [];
     this.chatMessages = [];
     this.selectedSquare = null;
     this.legalMoves = [];
+    this.pendingReward = null;
 
     // Dark background overlay
     this.add
@@ -67,9 +82,15 @@ export class ChessScene extends Phaser.Scene {
       .setDepth(LAYER.CHESSBOARD - 1)
       .setScrollFactor(0);
 
-    // Center the board
-    this.boardX = (BASE_WIDTH - CHESS_BOARD_SIZE) / 2;
-    this.boardY = (BASE_HEIGHT - CHESS_BOARD_SIZE) / 2 - 40;
+    // Size the board to fill ~90% of the smaller screen dimension, leaving room for labels
+    const margin = 80; // space for status text, player labels
+    const maxBoardH = BASE_HEIGHT - margin * 2;
+    const maxBoardW = BASE_WIDTH * 0.75; // leave room for captured pieces on the side
+    this.sqSize = Math.floor(Math.min(maxBoardH, maxBoardW) / 8);
+    this.brdSize = this.sqSize * 8;
+
+    this.boardX = (BASE_WIDTH - this.brdSize) / 2;
+    this.boardY = (BASE_HEIGHT - this.brdSize) / 2;
 
     this.boardGraphics = this.add.graphics().setDepth(LAYER.CHESSBOARD).setScrollFactor(0);
     this.highlightGraphics = this.add.graphics().setDepth(LAYER.CHESSBOARD + 1).setScrollFactor(0);
@@ -95,7 +116,7 @@ export class ChessScene extends Phaser.Scene {
     const topLabel = this.playerColor === "w" ? this.opponentUsername : this.username;
 
     this.add
-      .text(this.boardX, this.boardY + CHESS_BOARD_SIZE + 12, bottomLabel, {
+      .text(this.boardX, this.boardY + this.brdSize + 12, bottomLabel, {
         fontSize: "16px",
         color: "#ffffff",
         fontFamily: "monospace",
@@ -115,7 +136,7 @@ export class ChessScene extends Phaser.Scene {
 
     // Captured pieces display
     this.capturedText = this.add
-      .text(this.boardX + CHESS_BOARD_SIZE + 20, this.boardY + CHESS_BOARD_SIZE - 20, "", {
+      .text(this.boardX + this.brdSize + 20, this.boardY + this.brdSize - 20, "", {
         fontSize: "18px",
         color: "#ffffff",
         fontFamily: "monospace",
@@ -126,7 +147,7 @@ export class ChessScene extends Phaser.Scene {
       .setScrollFactor(0);
 
     this.capturedTextOpponent = this.add
-      .text(this.boardX + CHESS_BOARD_SIZE + 20, this.boardY + 20, "", {
+      .text(this.boardX + this.brdSize + 20, this.boardY + 20, "", {
         fontSize: "18px",
         color: "#ffffff",
         fontFamily: "monospace",
@@ -135,18 +156,29 @@ export class ChessScene extends Phaser.Scene {
       .setDepth(LAYER.CHESS_PIECES + 1)
       .setScrollFactor(0);
 
-    // Battle chat
-    this.chatTextObj = this.add
-      .text(16, BASE_HEIGHT - 200, "", {
-        fontSize: `${CHAT_FONT_SIZE}px`,
-        color: "#aaaaff",
-        fontFamily: "monospace",
-        wordWrap: { width: 350 },
-        lineSpacing: 4,
-      })
-      .setOrigin(0, 1)
-      .setDepth(LAYER.CHESS_PIECES + 2)
-      .setScrollFactor(0);
+    // Battle chat display (DOM element)
+    this.chatTextEl = document.createElement("div");
+    Object.assign(this.chatTextEl.style, {
+      position: "absolute",
+      bottom: "68px",
+      left: "16px",
+      width: "350px",
+      maxHeight: "300px",
+      overflow: "hidden",
+      color: "#fff",
+      fontFamily: "monospace",
+      fontSize: "14px",
+      lineHeight: "1.4",
+      padding: "8px 12px",
+      background: "#1a1a2e",
+      border: "1px solid #444",
+      borderRadius: "6px",
+      boxSizing: "border-box",
+      pointerEvents: "none",
+      zIndex: "10",
+      display: "none",
+    });
+    document.getElementById("game-container")!.appendChild(this.chatTextEl);
 
     this.chatInput = document.createElement("input");
     this.chatInput.type = "text";
@@ -184,6 +216,9 @@ export class ChessScene extends Phaser.Scene {
       this.handleBoardClick(pointer.x, pointer.y);
     });
 
+    // Periodically expire old chat messages
+    this.time.addEvent({ delay: 1000, loop: true, callback: () => this.refreshChat() });
+
     this.connectToChessRoom();
   }
 
@@ -196,17 +231,17 @@ export class ChessScene extends Phaser.Scene {
         const isLight = (row + col) % 2 === 0;
         g.fillStyle(isLight ? COLOR_CHESS_LIGHT : COLOR_CHESS_DARK, 1);
         g.fillRect(
-          this.boardX + col * CHESS_SQUARE_SIZE,
-          this.boardY + row * CHESS_SQUARE_SIZE,
-          CHESS_SQUARE_SIZE,
-          CHESS_SQUARE_SIZE
+          this.boardX + col * this.sqSize,
+          this.boardY + row * this.sqSize,
+          this.sqSize,
+          this.sqSize
         );
       }
     }
 
     // Board border
     g.lineStyle(3, 0x444444, 1);
-    g.strokeRect(this.boardX, this.boardY, CHESS_BOARD_SIZE, CHESS_BOARD_SIZE);
+    g.strokeRect(this.boardX, this.boardY, this.brdSize, this.brdSize);
 
     // Rank/file labels
     const files = "abcdefgh";
@@ -217,8 +252,8 @@ export class ChessScene extends Phaser.Scene {
     for (let i = 0; i < 8; i++) {
       this.add
         .text(
-          this.boardX + i * CHESS_SQUARE_SIZE + CHESS_SQUARE_SIZE / 2,
-          this.boardY + CHESS_BOARD_SIZE + 4,
+          this.boardX + i * this.sqSize + this.sqSize / 2,
+          this.boardY + this.brdSize + 4,
           displayFiles[i],
           { fontSize: "12px", color: "#888888", fontFamily: "monospace" }
         )
@@ -229,7 +264,7 @@ export class ChessScene extends Phaser.Scene {
       this.add
         .text(
           this.boardX - 12,
-          this.boardY + i * CHESS_SQUARE_SIZE + CHESS_SQUARE_SIZE / 2,
+          this.boardY + i * this.sqSize + this.sqSize / 2,
           displayRanks[i],
           { fontSize: "12px", color: "#888888", fontFamily: "monospace" }
         )
@@ -250,10 +285,10 @@ export class ChessScene extends Phaser.Scene {
         if (!piece) continue;
 
         const { displayRow, displayCol } = this.toDisplayCoords(row, col);
-        const cx = this.boardX + displayCol * CHESS_SQUARE_SIZE + CHESS_SQUARE_SIZE / 2;
-        const cy = this.boardY + displayRow * CHESS_SQUARE_SIZE + CHESS_SQUARE_SIZE / 2;
+        const cx = this.boardX + displayCol * this.sqSize + this.sqSize / 2;
+        const cy = this.boardY + displayRow * this.sqSize + this.sqSize / 2;
 
-        drawPiece(g, piece.type, piece.color, cx, cy);
+        drawPiece(g, piece.type, piece.color, cx, cy, this.sqSize);
       }
     }
   }
@@ -269,10 +304,10 @@ export class ChessScene extends Phaser.Scene {
     const { displayRow: sr, displayCol: sc } = this.toDisplayCoords(selRow, selCol);
     g.fillStyle(COLOR_CHESS_HIGHLIGHT, 0.5);
     g.fillRect(
-      this.boardX + sc * CHESS_SQUARE_SIZE,
-      this.boardY + sr * CHESS_SQUARE_SIZE,
-      CHESS_SQUARE_SIZE,
-      CHESS_SQUARE_SIZE
+      this.boardX + sc * this.sqSize,
+      this.boardY + sr * this.sqSize,
+      this.sqSize,
+      this.sqSize
     );
 
     // Highlight legal move targets
@@ -281,16 +316,16 @@ export class ChessScene extends Phaser.Scene {
       const { displayRow: dr, displayCol: dc } = this.toDisplayCoords(row, col);
       g.fillStyle(COLOR_CHESS_HIGHLIGHT, 0.3);
       g.fillCircle(
-        this.boardX + dc * CHESS_SQUARE_SIZE + CHESS_SQUARE_SIZE / 2,
-        this.boardY + dr * CHESS_SQUARE_SIZE + CHESS_SQUARE_SIZE / 2,
-        CHESS_SQUARE_SIZE * 0.2
+        this.boardX + dc * this.sqSize + this.sqSize / 2,
+        this.boardY + dr * this.sqSize + this.sqSize / 2,
+        this.sqSize * 0.2
       );
     }
   }
 
   private handleBoardClick(screenX: number, screenY: number): void {
-    const col = Math.floor((screenX - this.boardX) / CHESS_SQUARE_SIZE);
-    const row = Math.floor((screenY - this.boardY) / CHESS_SQUARE_SIZE);
+    const col = Math.floor((screenX - this.boardX) / this.sqSize);
+    const row = Math.floor((screenY - this.boardY) / this.sqSize);
 
     if (col < 0 || col > 7 || row < 0 || row > 7) return;
 
@@ -394,6 +429,7 @@ export class ChessScene extends Phaser.Scene {
       this.room = await colyseusClient.joinOrCreate("chess", {
         username: this.username,
         color: this.playerColor,
+        ...(this.isNpc ? { isNpc: true, npcId: this.npcId, fen: this.customFen || undefined } : {}),
       });
 
       this.room.onMessage(MSG.CHESS_MOVE, (data: { from: string; to: string; promotion?: string }) => {
@@ -413,13 +449,13 @@ export class ChessScene extends Phaser.Scene {
       });
 
       this.room.onMessage(MSG.CHESS_GAME_OVER, (data: GameOverData) => {
+        this.pendingReward = data.reward ?? null;
         this.showGameOverDialog(data);
       });
 
       this.room.onMessage(MSG.CHESS_CHAT, (msg: { username: string; text: string }) => {
-        this.chatMessages.push(`${msg.username}: ${msg.text}`);
-        const visible = this.chatMessages.slice(-8);
-        this.chatTextObj.setText(visible.join("\n"));
+        this.chatMessages.push({ text: `${msg.username}: ${msg.text}`, time: Date.now() });
+        this.refreshChat();
       });
     } catch (err) {
       console.error("Failed to join chess room:", err);
@@ -461,9 +497,13 @@ export class ChessScene extends Phaser.Scene {
       color: "#fff",
       fontFamily: "'Segoe UI', Arial, sans-serif",
     });
+    const rewardHtml = data.reward
+      ? `<p style="color:#ffcc00;font-size:20px;margin-bottom:16px;">You unlocked: ${data.reward.name} ${data.reward.type}!</p>`
+      : "";
     dialog.innerHTML = `
       <h2 style="font-size:32px;margin-bottom:12px;">${message}</h2>
-      <p style="color:#999;margin-bottom:24px;">Reason: ${data.reason}</p>
+      <p style="color:#999;margin-bottom:${data.reward ? "12px" : "24px"};">Reason: ${data.reason}</p>
+      ${rewardHtml}
       <button id="chess-exit" style="background:#3399ff;color:#fff;border:none;padding:12px 32px;border-radius:8px;cursor:pointer;font-size:18px;">Return to Overworld</button>
     `;
     overlay.appendChild(dialog);
@@ -475,15 +515,27 @@ export class ChessScene extends Phaser.Scene {
     });
   }
 
+  private refreshChat(): void {
+    const CHAT_TTL_MS = 30_000;
+    const now = Date.now();
+    const visible = this.chatMessages
+      .filter((m) => now - m.time < CHAT_TTL_MS)
+      .slice(-10)
+      .map((m) => m.text);
+    this.chatTextEl.innerText = visible.join("\n");
+    this.chatTextEl.style.display = visible.length > 0 ? "" : "none";
+  }
+
   private exitChess(): void {
     if (this.room) {
       this.room.leave();
       this.room = null;
     }
     this.chatInput.remove();
+    this.chatTextEl.remove();
     this.scene.stop();
     const overworld = this.scene.get("OverworldScene") as any;
-    overworld.resumeFromChess();
+    overworld.resumeFromChess(this.pendingReward);
   }
 
   // ── Coordinate helpers ────────────────────────────────

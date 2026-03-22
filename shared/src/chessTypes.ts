@@ -21,6 +21,7 @@ export interface ChessMoveData {
 export interface GameOverData {
   result: GameResult;
   reason: EndReason;
+  reward?: { type: string; name: string };
 }
 
 export interface BattleRequestData {

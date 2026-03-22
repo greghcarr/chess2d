@@ -11,6 +11,9 @@ export const MSG = {
   CHESS_GAME_OVER: "chessGameOver",
   CHESS_CHAT: "chessChat",
   SPECTATE_JOIN: "spectateJoin",
+  HUE_CHANGE: "hueChange",
+  SHAPE_CHANGE: "shapeChange",
+  BATTLE_END: "battleEnd",
 } as const;
 
 export type MessageType = (typeof MSG)[keyof typeof MSG];

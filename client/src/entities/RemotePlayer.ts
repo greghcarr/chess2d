@@ -2,10 +2,12 @@ import Phaser from "phaser";
 import {
   PLAYER_RADIUS,
   PLAYER_NAME_OFFSET_Y,
-  COLOR_REMOTE_PLAYER,
+  CHAT_BUBBLE_OFFSET_Y,
+  CHAT_BUBBLE_DURATION,
   INTERPOLATION_SPEED,
 } from "@/constants.js";
 import { LAYER } from "@/layers.js";
+import { drawPlayerShape } from "@/entities/drawPlayerShape.js";
 
 export class RemotePlayer {
   readonly graphics: Phaser.GameObjects.Graphics;
@@ -17,13 +19,24 @@ export class RemotePlayer {
   readonly username: string;
   readonly sessionId: string;
   inBattle = false;
+  readonly isNpc: boolean;
+  readonly isScenario: boolean;
+  private color: number;
+  private shape: string;
+  private chatBubble: Phaser.GameObjects.Text | null = null;
+  private chatBubbleTimer: Phaser.Time.TimerEvent | null = null;
+  private scene: Phaser.Scene;
 
   constructor(
     scene: Phaser.Scene,
     sessionId: string,
     x: number,
     y: number,
-    username: string
+    username: string,
+    color: number = 0x3399ff,
+    isNpc: boolean = false,
+    isScenario: boolean = false,
+    isAdmin: boolean = false
   ) {
     this.sessionId = sessionId;
     this.x = x;
@@ -31,6 +44,11 @@ export class RemotePlayer {
     this.serverX = x;
     this.serverY = y;
     this.username = username;
+    this.color = color;
+    this.shape = "circle";
+    this.isNpc = isNpc;
+    this.isScenario = isScenario;
+    this.scene = scene;
 
     this.graphics = scene.add.graphics();
     this.graphics.setDepth(LAYER.REMOTE_PLAYERS);
@@ -40,12 +58,15 @@ export class RemotePlayer {
     );
     this.graphics.input!.cursor = "pointer";
 
+    const displayName = isAdmin ? `[Admin] ${username}` : username;
+    const nameColor = isNpc ? "#ffcc00" : isAdmin ? "#ff4444" : "#cccccc";
     this.nameText = scene.add
-      .text(x, y + PLAYER_NAME_OFFSET_Y, username, {
+      .text(x, y + PLAYER_NAME_OFFSET_Y, displayName, {
         fontSize: "13px",
-        color: "#cccccc",
+        color: nameColor,
         fontFamily: "monospace",
         align: "center",
+        resolution: 2,
       })
       .setOrigin(0.5, 1)
       .setDepth(LAYER.PLAYER_NAMES);
@@ -64,17 +85,31 @@ export class RemotePlayer {
     this.draw();
   }
 
+  setColor(color: number): void {
+    this.color = color;
+  }
+
+  setShape(shape: string): void {
+    this.shape = shape;
+  }
+
   private draw(): void {
     this.graphics.clear();
-    this.graphics.fillStyle(COLOR_REMOTE_PLAYER, 1);
-    this.graphics.fillCircle(this.x, this.y, PLAYER_RADIUS);
-    this.graphics.fillRoundedRect(
-      this.x - PLAYER_RADIUS * 0.6,
-      this.y + PLAYER_RADIUS * 0.4,
-      PLAYER_RADIUS * 1.2,
-      PLAYER_RADIUS * 1.0,
-      4
-    );
+    drawPlayerShape(this.graphics, this.x, this.y, this.shape, this.color);
+
+    // Battle indicator — crossed swords above player (not shown on NPCs)
+    if (this.inBattle && !this.isNpc) {
+      const sx = this.x;
+      const sy = this.y - PLAYER_RADIUS * 1.8;
+      this.graphics.lineStyle(2, 0xff4444, 0.9);
+      // Left sword: top-right to bottom-left
+      this.graphics.lineBetween(sx - 5, sy - 6, sx + 5, sy + 6);
+      // Right sword: top-left to bottom-right
+      this.graphics.lineBetween(sx + 5, sy - 6, sx - 5, sy + 6);
+      // Small circle at the cross
+      this.graphics.strokeCircle(sx, sy, 3);
+    }
+
     // Update interactive hitarea position
     this.graphics.input!.hitArea = new Phaser.Geom.Circle(
       this.x,
@@ -82,10 +117,35 @@ export class RemotePlayer {
       PLAYER_RADIUS * 1.5
     );
     this.nameText.setPosition(this.x, this.y + PLAYER_NAME_OFFSET_Y);
+    this.chatBubble?.setPosition(this.x, this.y + CHAT_BUBBLE_OFFSET_Y);
+  }
+
+  showChatBubble(text: string): void {
+    this.chatBubble?.destroy();
+    this.chatBubbleTimer?.remove();
+
+    const cssColor = `#${this.color.toString(16).padStart(6, "0")}`;
+    this.chatBubble = this.scene.add
+      .text(this.x, this.y + CHAT_BUBBLE_OFFSET_Y, text, {
+        fontSize: "12px",
+        color: cssColor,
+        fontFamily: "monospace",
+        align: "center",
+        wordWrap: { width: 160 },
+      })
+      .setOrigin(0.5, 1)
+      .setDepth(LAYER.PLAYER_NAMES);
+
+    this.chatBubbleTimer = this.scene.time.delayedCall(CHAT_BUBBLE_DURATION, () => {
+      this.chatBubble?.destroy();
+      this.chatBubble = null;
+    });
   }
 
   destroy(): void {
     this.graphics.destroy();
     this.nameText.destroy();
+    this.chatBubble?.destroy();
+    this.chatBubbleTimer?.remove();
   }
 }

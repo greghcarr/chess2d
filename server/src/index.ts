@@ -13,8 +13,14 @@ import { ChessRoom } from "./rooms/ChessRoom";
 const PORT = parseInt(process.env.COLYSEUS_PORT || "2567");
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: true }));
 app.use(express.json());
+
+// Log all matchmake requests for debugging
+app.use("/matchmake", (req, _res, next) => {
+  console.log(`[matchmake] ${req.method} ${req.url} from ${req.ip}`);
+  next();
+});
 
 app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -29,6 +35,7 @@ const gameServer = new Server({
 gameServer.define("overworld", OverworldRoom);
 gameServer.define("chess", ChessRoom);
 
-httpServer.listen(PORT, () => {
-  console.log(`Chess2D server listening on port ${PORT}`);
+const HOST = process.env.HOST || "0.0.0.0";
+httpServer.listen(PORT, HOST, () => {
+  console.log(`chess2D server listening on ${HOST}:${PORT}`);
 });

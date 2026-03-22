@@ -1,4 +1,4 @@
-# Chess2D
+# chess2D
 
 Browser-based MMO chess game. Players explore a top-down overworld and challenge each other to chess matches.
 
