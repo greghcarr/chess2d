@@ -24,7 +24,7 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm install
-      - run: npm run build --workspace=client
+      - run: npx --workspace=client vite build
         env:
           VITE_COLYSEUS_URL: ${{ vars.COLYSEUS_URL }}
           VITE_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
