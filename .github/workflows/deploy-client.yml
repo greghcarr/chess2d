@@ -24,7 +24,6 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm install
-      - run: npm run build --workspace=shared
       - run: npm run build --workspace=client
         env:
           VITE_COLYSEUS_URL: ${{ vars.COLYSEUS_URL }}
